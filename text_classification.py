@@ -40,34 +40,38 @@ if __name__ == '__main__':
     model_ckpt = "distilbert-base-uncased"
     tokenizer = AutoTokenizer.from_pretrained(model_ckpt)
     print("token 숫자", tokenizer.vocab_size)
-    
-    
+
     text = "I love you daehwi"
-    encode_text = tokenizer(text, return_tensors= "pt")
+    encode_text = tokenizer(text, return_tensors="pt")
+
+
     # token = tokenizer.convert_ids_to_tokens(encode_text.input_ids)
 
     def tokenize(batch):
         return tokenizer(batch['text'], padding=True, truncation=True)
 
-    print(tokenize(dataset['train'][:2]))
 
-    # emotion_encoded = dataset.map(tokenize, batched=True, batch_size=None)
-    # print(emotion_encoded)
-    #
-    device= 'cuda' if torch.cuda.is_available() else 'cpu'
+    # print(tokenize(dataset['train'][:2]))
+
+    emotion_encoded = dataset.map(tokenize, batched=True, batch_size=None)
+    print(emotion_encoded)
+
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
     model = AutoModel.from_pretrained('distilbert-base-uncased').to(device)
+    print(tokenizer.model_input_names)
+
+    def extract_hidden_state(batch):
+        inputs = {k: v.to(device) for k, v in batch.items() if k in tokenizer.model_input_names}
+        print(inputs)
+        with torch.no_grad():
+            outputs = model(**inputs).last_hidden_state
+        return {"hidden_state": outputs[:, 0].cpu().numpy()}
 
 
-    inputs = {k:v.to(device) for k,v in encode_text.items()}
-    with torch.no_grad():
-        outputs = model(**inputs)
-    print(outputs)
-    print(outputs.shape)
+    emotion_encoded.set_format('torch', columns=["input_ids", "attention_mask", "label"])
+    emotions_hidden = emotion_encoded.map(extract_hidden_state, batched=True)
 
-
+    print(emotions_hidden)
 
     # print(encode_text)
     # print(token)
-
-
-
