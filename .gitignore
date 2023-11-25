@@ -1,3 +1,5 @@
 .idea
 mlruns
 distilbert-base-uncased-finetuned-emotion
+__pycache__
+model/__pycache__
