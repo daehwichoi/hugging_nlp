@@ -57,12 +57,9 @@ if __name__ == '__main__':
     # print(tokenize(dataset['train'][:2]))
 
     emotion_encoded = dataset.map(tokenize, batched=True, batch_size=None)
-    print(emotion_encoded)
-
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     model = AutoModel.from_pretrained('distilbert-base-uncased').to(device)
     print(tokenizer.model_input_names)
-
 
     def extract_hidden_state(batch):
         inputs = {k: v.to(device) for k, v in batch.items() if k in tokenizer.model_input_names}
@@ -71,6 +68,10 @@ if __name__ == '__main__':
             outputs = model(**inputs).last_hidden_state
         return {"hidden_state": outputs[:, 0].cpu().numpy()}
 
+
+    emotion_encoded.set_format('torch', columns=["input_ids", "attention_mask", "label"])
+    emotions_hidden = emotion_encoded.map(extract_hidden_state, batched=True)
+    print(emotions_hidden)
 
     emotion_encoded.set_format('torch', columns=["input_ids", "attention_mask", "label"])
     emotions_hidden = emotion_encoded.map(extract_hidden_state, batched=True)
@@ -83,4 +84,3 @@ if __name__ == '__main__':
     lr_clf = LogisticRegression(max_iter=3000)
     lr_clf.fit(X_train, Y_train)
     print(lr_clf.score(X_valid, Y_valid))
-
