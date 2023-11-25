@@ -1,7 +1,10 @@
 import pandas as pd
 from datasets import list_datasets, load_dataset
 from transformers import AutoTokenizer, AutoModel
+
 import torch
+import numpy as np
+from sklearn.linear_model import LogisticRegression
 
 from collections import Counter
 
@@ -40,34 +43,44 @@ if __name__ == '__main__':
     model_ckpt = "distilbert-base-uncased"
     tokenizer = AutoTokenizer.from_pretrained(model_ckpt)
     print("token 숫자", tokenizer.vocab_size)
-    
-    
+
     text = "I love you daehwi"
-    encode_text = tokenizer(text, return_tensors= "pt")
+    encode_text = tokenizer(text, return_tensors="pt")
+
+
     # token = tokenizer.convert_ids_to_tokens(encode_text.input_ids)
 
     def tokenize(batch):
         return tokenizer(batch['text'], padding=True, truncation=True)
 
-    print(tokenize(dataset['train'][:2]))
 
-    # emotion_encoded = dataset.map(tokenize, batched=True, batch_size=None)
-    # print(emotion_encoded)
-    #
-    device= 'cuda' if torch.cuda.is_available() else 'cpu'
+    # print(tokenize(dataset['train'][:2]))
+
+    emotion_encoded = dataset.map(tokenize, batched=True, batch_size=None)
+    print(emotion_encoded)
+
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
     model = AutoModel.from_pretrained('distilbert-base-uncased').to(device)
+    print(tokenizer.model_input_names)
 
 
-    inputs = {k:v.to(device) for k,v in encode_text.items()}
-    with torch.no_grad():
-        outputs = model(**inputs)
-    print(outputs)
-    print(outputs.shape)
+    def extract_hidden_state(batch):
+        inputs = {k: v.to(device) for k, v in batch.items() if k in tokenizer.model_input_names}
+        print(inputs)
+        with torch.no_grad():
+            outputs = model(**inputs).last_hidden_state
+        return {"hidden_state": outputs[:, 0].cpu().numpy()}
 
 
+    emotion_encoded.set_format('torch', columns=["input_ids", "attention_mask", "label"])
+    emotions_hidden = emotion_encoded.map(extract_hidden_state, batched=True)
 
-    # print(encode_text)
-    # print(token)
+    X_train = np.array(emotions_hidden['train']['hidden_state'])
+    X_valid = np.array(emotions_hidden['validation']['hidden_state'])
+    Y_train = np.array(emotions_hidden['train']['label'])
+    Y_valid = np.array(emotions_hidden['validation']['label'])
 
-
+    lr_clf = LogisticRegression(max_iter=3000)
+    lr_clf.fit(X_train, Y_train)
+    print(lr_clf.score(X_valid, Y_valid))
 
