@@ -5,7 +5,7 @@ import torch.nn.functional as F
 from transformers import AutoConfig
 from transformers import AutoTokenizer
 
-from model.torch_transformer import TransformerEncoder
+from model.transformer_model import TransformerForSequenceClassification
 
 if __name__ == '__main__':
     text = "I love korea"
@@ -18,9 +18,9 @@ if __name__ == '__main__':
     embed = tokenizer(text)
     print(embed.input_ids)
 
-    token_emb = nn.Embedding(config.vocab_size, config.hidden_size)
-    text_embed = token_emb(torch.LongTensor(embed.input_ids)).unsqueeze(0)
-    print(text_embed.shape)
+    # token_emb = nn.Embedding(config.vocab_size, config.hidden_size)
+    # text_embed = token_emb(torch.LongTensor(embed.input_ids)).unsqueeze(0)
+    # print(text_embed.shape)
 
     # 유사도 계산
     # query = text_embed
@@ -39,6 +39,8 @@ if __name__ == '__main__':
     # print(output)
 
     # Multi Head 적용
-    model = TransformerEncoder(config)
-    output = model(text_embed)
+    token_embed = torch.LongTensor(embed.input_ids).unsqueeze(0)
+    print(token_embed.shape)
+    model = TransformerForSequenceClassification(config, num_labels=2)
+    output = model(token_embed)
     print(output)
