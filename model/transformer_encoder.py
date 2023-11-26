@@ -5,8 +5,11 @@ import torch.nn.functional as F
 from math import sqrt
 
 
-def scaled_dot_product_attention(query, key, value):
+def scaled_dot_product_attention(query, key, value, mask=None):
     score = torch.bmm(query, key.transpose(1, 2)) / sqrt(key.size(-1))
+    if mask is not None:
+        score = score.masked_fill(mask == 0, float("-inf"))
+
     weights = F.softmax(score, dim=-1)
     return torch.bmm(weights, value)
 
@@ -87,6 +90,7 @@ class TransformerEncoderLayer(nn.Module):
         x = x + self.attention(hidden_state)
         x = x + self.feed_forward(self.layer_norm2(x))
         return x
+
 
 class TransformerEncoder(nn.Module):
     def __init__(self, config):

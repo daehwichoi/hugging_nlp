@@ -5,7 +5,7 @@ import torch.nn.functional as F
 from transformers import AutoConfig
 from transformers import AutoTokenizer
 
-from model.transformer_model import TransformerForSequenceClassification
+from model.classification_model import TransformerForSequenceClassification
 
 if __name__ == '__main__':
     text = "I love korea"
@@ -16,6 +16,8 @@ if __name__ == '__main__':
 
     tokenizer = AutoTokenizer.from_pretrained(model_ckpt, return_tensors="pt", add_special_tokens=False)
     embed = tokenizer(text)
+    embed.input_ids = torch.LongTensor(embed.input_ids).unsqueeze(0)
+
     print(embed.input_ids)
 
     # token_emb = nn.Embedding(config.vocab_size, config.hidden_size)
@@ -38,9 +40,16 @@ if __name__ == '__main__':
     # output = model(text_embed)
     # print(output)
 
-    # Multi Head 적용
-    token_embed = torch.LongTensor(embed.input_ids).unsqueeze(0)
-    print(token_embed.shape)
-    model = TransformerForSequenceClassification(config, num_labels=2)
-    output = model(token_embed)
-    print(output)
+    # Encoder 단
+    # token_embed = torch.LongTensor(embed.input_ids).unsqueeze(0)
+    # model = TransformerForSequenceClassification(config, num_labels=2)
+    # output = model(token_embed)
+
+    # Decoder 단
+    seq_len = embed.input_ids.size(-1)
+    # decoder 단에서는 앞 부분을 볼 수 없기 때문에 mask 필요
+    mask = torch.tril(torch.ones(seq_len, seq_len)).unsqueeze(0)
+
+
+
+    print(mask[0])
