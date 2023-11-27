@@ -5,7 +5,7 @@ import torch.nn.functional as F
 from transformers import AutoConfig
 from transformers import AutoTokenizer
 
-from model.classification_model import TransformerForSequenceClassification
+from model.text_classifier import TransformerForSequenceClassification
 
 if __name__ == '__main__':
     text = "I love korea"
