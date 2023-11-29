@@ -34,7 +34,7 @@ if __name__ == '__main__':
     n_steps = 10
     choices_per_step = 5
     max_length = 128
-    output = model.generate(input_ids, max_length=max_length, do_sample=False, num_beams=5, no_repeat_ngram_size=2)
+    output = model.generate(input_ids, max_length=max_length, do_sample=True, temperature=0.5, top_k=0)
     # logp = sequence_logprob(model, output, input_len=(input_ids[0]))
     # print("log probability : {logp:.2f]")
     print(tokenizer.decode(output[0]))
