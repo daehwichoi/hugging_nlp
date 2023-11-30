@@ -24,7 +24,7 @@ def sequence_logprob(model, labels, input_len=0):
 if __name__ == '__main__':
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-    text = "I want"
+    text = "I want to go"
 
     model_name = 'gpt2-xl'
     tokenizer = AutoTokenizer.from_pretrained(model_name)
@@ -34,7 +34,7 @@ if __name__ == '__main__':
     n_steps = 10
     choices_per_step = 5
     max_length = 128
-    output = model.generate(input_ids, max_length=max_length, do_sample=True, temperature=0.5, top_k=0)
+    output = model.generate(input_ids, max_length=max_length, do_sample=True, top_k=50)
     # logp = sequence_logprob(model, output, input_len=(input_ids[0]))
     # print("log probability : {logp:.2f]")
     print(tokenizer.decode(output[0]))
