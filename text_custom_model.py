@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset
 
+from transformers import AutoConfig
 from transformers import AutoTokenizer
 from transformers import AutoModelForSequenceClassification
 
@@ -21,27 +22,22 @@ class CustomDataset(Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
-        if len(self.label[idx]) > 1:
-            # print(random.randint(len(self.label[idx])))
-            label = self.label[idx][0]
-            print(label)
-        else:
-            label = self.label[idx]
-
-        return torch.LongTensor(self.data[idx]).unsqueeze(0), torch.LongTensor(label).unsqueeze(0)
+        return torch.LongTensor(self.data[idx]), self.label[idx]
 
 
 class CustomModel(nn.Module):
     def __init__(self):
         super().__init__()
-        self.encoder_layer = nn.TransformerEncoderLayer(4, 4)
+
+        self.embedding = nn.Embedding()
+        self.encoder_layer = nn.TransformerEncoderLayer(680, 4)
         self.transformer = nn.TransformerEncoder(self.encoder_layer, 4)
         self.fc = nn.Linear(100, 2)
 
     def forward(self, x):
         x = self.transformer(x)
+        print(x.shape)
         x = self.fc(x)
-        print(x)
         return x
 
 
@@ -54,17 +50,25 @@ if __name__ == '__main__':
     tokenizer = AutoTokenizer.from_pretrained("quantumaikr/llama-2-70b-fb16-korean")
     train_encode_text = tokenizer(dataset["train"]["text"], padding=True)
     # length : 680
-    # print(train_encode_text["input_ids"])
-    train_encode_text = np.array(train_encode_text["input_ids"])
-    train_labels = np.array(dataset["train"]["label"])
+    datas = []
+    labels = []
 
-    trainset = CustomDataset(train_encode_text, train_labels)
-    trainloader = DataLoader(trainset, shuffle=True, batch_size=128)
+    for x,y in zip(train_encode_text["input_ids"], dataset["train"]["label"]):
+        for i in range(len(y)):
+            datas.append(x)
+            labels.append(y[i])
+
+    datas = np.array(datas)
+
+    trainset = CustomDataset(datas, labels)
+    trainloader = DataLoader(trainset, shuffle=True, batch_size=128, drop_last=True)
+    model = CustomModel().to(device)
 
     for idx, (input, label) in enumerate(trainloader):
-        print(input, label)
+        input = input.to(device)
+        output = model(input)
+        print(output)
 
-    model = CustomModel()
 
     # train_loader = DataLoader()
 
