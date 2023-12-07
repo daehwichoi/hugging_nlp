@@ -26,17 +26,17 @@ class CustomDataset(Dataset):
 
 
 class CustomModel(nn.Module):
-    def __init__(self):
+    def __init__(self, config):
         super().__init__()
 
-        self.embedding = nn.Embedding()
-        self.encoder_layer = nn.TransformerEncoderLayer(680, 4)
+        self.embedding = nn.Embedding(config.vocab_size, config.hidden_size // 4)
+        self.encoder_layer = nn.TransformerEncoderLayer(config.hidden_size // 4, 4)
         self.transformer = nn.TransformerEncoder(self.encoder_layer, 4)
-        self.fc = nn.Linear(100, 2)
+        self.fc = nn.Linear(config.hidden_size // 4, 9)
 
     def forward(self, x):
-        x = self.transformer(x)
-        print(x.shape)
+        x = self.embedding(x)
+        x = self.transformer(x)[:, 0, :]
         x = self.fc(x)
         return x
 
@@ -47,28 +47,61 @@ if __name__ == '__main__':
     # dataset load
     dataset = load_dataset("jeanlee/kmhas_korean_hate_speech")
 
-    tokenizer = AutoTokenizer.from_pretrained("quantumaikr/llama-2-70b-fb16-korean")
+    pre_ckpt = "quantumaikr/llama-2-70b-fb16-korean"
+    tokenizer = AutoTokenizer.from_pretrained(pre_ckpt)
+    config = AutoConfig.from_pretrained(pre_ckpt)
+
     train_encode_text = tokenizer(dataset["train"]["text"], padding=True)
+    test_encode_text = tokenizer(dataset["test"]["text"], padding=True)
     # length : 680
     datas = []
     labels = []
 
-    for x,y in zip(train_encode_text["input_ids"], dataset["train"]["label"]):
+    for x, y in zip(train_encode_text["input_ids"], dataset["train"]["label"]):
+        for i in range(len(y)):
+            datas.append(x)
+            labels.append(y[i])
+    datas = np.array(datas)
+    trainset = CustomDataset(datas, labels)
+
+    datas = []
+    labels = []
+
+    for x, y in zip(test_encode_text["input_ids"], dataset["test"]["label"]):
         for i in range(len(y)):
             datas.append(x)
             labels.append(y[i])
 
     datas = np.array(datas)
+    testset = CustomDataset(datas, labels)
 
-    trainset = CustomDataset(datas, labels)
-    trainloader = DataLoader(trainset, shuffle=True, batch_size=128, drop_last=True)
-    model = CustomModel().to(device)
+    trainloader = DataLoader(trainset, shuffle=True, batch_size=16, drop_last=True)
+    testloader = DataLoader(testset, shuffle=False, batch_size=1024, drop_last=False)
+    model = CustomModel(config).to(device)
 
+    criterion = nn.CrossEntropyLoss()
+    optim = torch.optim.Adam(model.parameters(), lr=0.002)
+
+    model.train()
     for idx, (input, label) in enumerate(trainloader):
         input = input.to(device)
-        output = model(input)
-        print(output)
+        label = torch.LongTensor(label).to(device)
 
+        optim.zero_grad()
+        output = model(input)
+        loss = criterion(output, label)
+        loss.backward()
+        optim.step()
+
+    model.eval()
+    with torch.no_grad():
+        for idx, (input, label) in enumerate(testset):
+            input = input.to(device)
+            label = torch.LongTensor(label).to(device)
+
+            output = model(input)
+            pred = torch.argmax(output, dim=-1)
+            print(pred)
 
     # train_loader = DataLoader()
 
