@@ -5,3 +5,4 @@ distilbert-base-uncased-finetuned-clinc
 __pycache__
 model/__pycache__
 model.pt
+text_classify.pt
