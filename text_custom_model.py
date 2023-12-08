@@ -29,10 +29,10 @@ class CustomModel(nn.Module):
     def __init__(self, config):
         super().__init__()
 
-        self.embedding = nn.Embedding(config.vocab_size, config.hidden_size // 4)
-        self.encoder_layer = nn.TransformerEncoderLayer(config.hidden_size // 4, 4)
-        self.transformer = nn.TransformerEncoder(self.encoder_layer, 4)
-        self.fc = nn.Linear(config.hidden_size // 4, 9)
+        self.embedding = nn.Embedding(config.vocab_size, config.hidden_size // 8)
+        self.encoder_layer = nn.TransformerEncoderLayer(config.hidden_size // 8, 4)
+        self.transformer = nn.TransformerEncoder(self.encoder_layer, 2)
+        self.fc = nn.Linear(config.hidden_size // 8, 9)
 
     def forward(self, x):
         x = self.embedding(x)
@@ -75,34 +75,47 @@ if __name__ == '__main__':
     datas = np.array(datas)
     testset = CustomDataset(datas, labels)
 
-    trainloader = DataLoader(trainset, shuffle=True, batch_size=16, drop_last=True)
+    trainloader = DataLoader(trainset, shuffle=True, batch_size=128, drop_last=True)
     testloader = DataLoader(testset, shuffle=False, batch_size=1024, drop_last=False)
     model = CustomModel(config).to(device)
 
     criterion = nn.CrossEntropyLoss()
     optim = torch.optim.Adam(model.parameters(), lr=0.002)
 
-    model.train()
-    for idx, (input, label) in enumerate(trainloader):
-        input = input.to(device)
-        label = torch.LongTensor(label).to(device)
+    n_epochs = 2
 
-        optim.zero_grad()
-        output = model(input)
-        loss = criterion(output, label)
-        loss.backward()
-        optim.step()
+    model.train()
+    for epoch in range(n_epochs):
+        for idx, (input, label) in enumerate(trainloader):
+            input = input.to(device)
+            label = torch.LongTensor(label).to(device)
+
+            optim.zero_grad()
+            output = model(input)
+            loss = criterion(output, label)
+            loss.backward()
+            optim.step()
+
+            if idx % 100 == 0:
+                print(f"{idx}'th Loss : {loss}")
+
+    weight = model.state_dict()
+    torch.save(weight, "./text_classify.pt")
 
     model.eval()
     with torch.no_grad():
+        total = 0
+        right = 0
         for idx, (input, label) in enumerate(testset):
             input = input.to(device)
             label = torch.LongTensor(label).to(device)
 
             output = model(input)
             pred = torch.argmax(output, dim=-1)
+            right += (pred == label)
             print(pred)
 
+    print(right)
     # train_loader = DataLoader()
 
     # print(train_encode_text["input_ids"][0])
