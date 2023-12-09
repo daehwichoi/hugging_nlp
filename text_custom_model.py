@@ -88,7 +88,8 @@ def model_test():
     torch.save(weight, "./text_classify.pt")
 
 def remove_special_text(batch):
-    batch["text"] = batch["text"].replace('"', '')
+    batch["text"] = batch["text"].replace(r'"', '')
+    return batch
 
 
 if __name__ == '__main__':
@@ -102,8 +103,9 @@ if __name__ == '__main__':
     tokenizer = AutoTokenizer.from_pretrained(pre_ckpt)
     config = AutoConfig.from_pretrained(pre_ckpt)
 
-    dataset["train"] = dataset["train"].map(remove_special_text)
-    dataset["test"] = dataset["test"].map(remove_special_text)
+    # dataset["train"]= dataset["train"].map(remove_special_text)
+    # print(dataset["train"]["text"])
+    # dataset["test"] = dataset["test"].map(remove_special_text)
 
     train_encode_text = tokenizer(dataset["train"]["text"], padding="max_length", max_length=300)
     test_encode_text = tokenizer(dataset["test"]["text"], padding="max_length", max_length=300)
