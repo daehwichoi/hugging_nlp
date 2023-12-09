@@ -38,7 +38,6 @@ class CustomModel(nn.Module):
         self.transformer = nn.TransformerEncoder(self.encoder_layer, 1)
         self.lstm = nn.LSTM(num_feature, num_feature)
 
-
         self.bn1 = nn.BatchNorm1d(num_feature)
         self.fc1 = nn.Linear(num_feature, 128)
         self.dropout = nn.Dropout(0.5)
@@ -54,7 +53,7 @@ class CustomModel(nn.Module):
 
     def forward(self, x):
         x = self.embedding(x)
-        x = self.transformer(x)[:, 0, :]
+        x = self.transformer(x)[:, 1, :]
         x = F.relu(self.fc1(self.bn1(x)))
         x = self.dropout(x)
         x = self.fc2(self.bn2(x))
@@ -73,12 +72,11 @@ def model_test():
             # label = torch.FloatTensor(label).to(device)
             label = torch.tensor(label, dtype=torch.float32).to(device)
 
-            korean = tokenizer.decode(input[0,:].cpu())
+            korean = tokenizer.decode(input[0, :].cpu(), skip_special_tokens=True)
             print(korean)
-
+            print(f"→ {'나쁜말' if label[0].cpu() == 1 else '보통말'}")
 
             output = model(input)
-            print(output)
             # pred = torch.argmax(output, dim=-1)
             pred = (output > 0.5).float()
             # print(pred)
@@ -88,6 +86,9 @@ def model_test():
     print(f"acc : {round(100 * right / total, 3)} %")
     weight = model.state_dict()
     torch.save(weight, "./text_classify.pt")
+
+def remove_special_text(batch):
+    batch["text"] = batch["text"].replace('"', '')
 
 
 if __name__ == '__main__':
@@ -101,8 +102,11 @@ if __name__ == '__main__':
     tokenizer = AutoTokenizer.from_pretrained(pre_ckpt)
     config = AutoConfig.from_pretrained(pre_ckpt)
 
-    train_encode_text = tokenizer(dataset["train"]["text"], padding="max_length", max_length= 300)
-    test_encode_text = tokenizer(dataset["test"]["text"], padding="max_length", max_length= 300)
+    dataset["train"] = dataset["train"].map(remove_special_text)
+    dataset["test"] = dataset["test"].map(remove_special_text)
+
+    train_encode_text = tokenizer(dataset["train"]["text"], padding="max_length", max_length=300)
+    test_encode_text = tokenizer(dataset["test"]["text"], padding="max_length", max_length=300)
 
     class_label = {0: "origin", 1: "physical", 2: "politics", 3: "profanity", 4: "age", 5: "gender", 6: "race",
                    7: "religion", 8: "not_hate_speech"}
@@ -152,7 +156,7 @@ if __name__ == '__main__':
     train_batch_size = 256
     test_batch_size = 512
     trainloader = DataLoader(trainset, shuffle=True, batch_size=train_batch_size, drop_last=True)
-    testloader = DataLoader(testset, shuffle=False, batch_size=test_batch_size, drop_last=True)
+    testloader = DataLoader(testset, shuffle=False, batch_size=test_batch_size, drop_last=False)
     model = CustomModel(config).to(device)
 
     criterion = nn.BCELoss()
