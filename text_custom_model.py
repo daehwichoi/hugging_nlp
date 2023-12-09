@@ -14,6 +14,8 @@ import random
 from collections import Counter
 from collections import defaultdict
 
+import random
+
 
 class CustomDataset(Dataset):
     def __init__(self, data, label):
@@ -34,7 +36,7 @@ class CustomModel(nn.Module):
         num_feature = config.hidden_size // 2
         print(f"num feature : {num_feature}")
         self.embedding = nn.Embedding(config.vocab_size, num_feature)
-        self.encoder_layer = nn.TransformerEncoderLayer(num_feature, 4)
+        self.encoder_layer = nn.TransformerEncoderLayer(num_feature, 8)
         self.transformer = nn.TransformerEncoder(self.encoder_layer, 1)
         self.lstm = nn.LSTM(num_feature, num_feature)
 
@@ -61,7 +63,7 @@ class CustomModel(nn.Module):
         return x
 
 
-def model_test():
+def model_test(print_sentence=5):
     global idx, input, label, output
     model.eval()
     with torch.no_grad():
@@ -71,10 +73,11 @@ def model_test():
             input = input.to(device)
             # label = torch.FloatTensor(label).to(device)
             label = torch.tensor(label, dtype=torch.float32).to(device)
-
-            korean = tokenizer.decode(input[0, :].cpu(), skip_special_tokens=True)
-            print(korean)
-            print(f"→ {'나쁜말' if label[0].cpu() == 1 else '보통말'}")
+            idx_list = random.sample([i for i in range(input.shape[0])], print_sentence)
+            for k in idx_list:
+                korean = tokenizer.decode(input[k, :].cpu(), skip_special_tokens=True)
+                print(korean)
+                print(f"- {'나쁜말' if label[0].cpu() == 1 else '보통말'}")
 
             output = model(input)
             # pred = torch.argmax(output, dim=-1)
@@ -98,6 +101,8 @@ if __name__ == '__main__':
     # dataset load
     dataset = load_dataset("jeanlee/kmhas_korean_hate_speech")
 
+    print(dataset)
+
     # pre_ckpt = "beomi/korean-hatespeech-classifier"
     pre_ckpt = "Tolerblanc/klue-bert-finetuned"
     tokenizer = AutoTokenizer.from_pretrained(pre_ckpt)
@@ -108,6 +113,7 @@ if __name__ == '__main__':
     # dataset["test"] = dataset["test"].map(remove_special_text)
 
     train_encode_text = tokenizer(dataset["train"]["text"], padding="max_length", max_length=300)
+    valid_encode_text = tokenizer(dataset["validation"]["text"], padding="max_length", max_length=300)
     test_encode_text = tokenizer(dataset["test"]["text"], padding="max_length", max_length=300)
 
     class_label = {0: "origin", 1: "physical", 2: "politics", 3: "profanity", 4: "age", 5: "gender", 6: "race",
@@ -137,6 +143,13 @@ if __name__ == '__main__':
         #     datas.append(x)
         #     labels.append(y[i])
         #     data_counter[y[i]] += 1
+    for x, y in zip(valid_encode_text["input_ids"], dataset["validation"]["label"]):
+        datas.append(x)
+        if y[0] == 8:
+            labels.append(0)
+        else:
+            labels.append(1)
+
     data_counter = Counter(labels)
     print(data_counter)
 
