@@ -4,6 +4,8 @@ import pandas as pd
 from sklearn.preprocessing import MultiLabelBinarizer
 from skmultilearn.model_selection import iterative_train_test_split
 
+from datasets import Dataset, DatasetDict
+
 
 def filter_labels(x):
     return [label_map[label] for label in x if label in label_map]
@@ -40,7 +42,7 @@ if __name__ == '__main__':
 
     df_issues["split"] = "unlabeled"
     mask = df_issues["labels"].apply(lambda x: len(x)) > 0
-    df_issues.loc[mask,"split"] = "labeled"
+    df_issues.loc[mask, "split"] = "labeled"
     df_issues["split"].value_counts().to_frame()
 
     for column in ["title", "body", "labels"]:
@@ -65,3 +67,27 @@ if __name__ == '__main__':
     df_train, df_tmp = balanced_split(df_sup, test_size=0.5)
     df_valid, df_test = balanced_split(df_tmp, test_size=0.5)
     print(df_train)
+
+    ds = DatasetDict({'train': Dataset.from_pandas(df_train.reset_index(drop=True)),
+                      'valid': Dataset.from_pandas(df_valid.reset_index(drop=True)),
+                      'test': Dataset.from_pandas(df_test.reset_index(drop=True)),
+                      'unsup': Dataset.from_pandas(df_unsup.reset_index(drop=True))})
+
+    print(ds)
+
+    np.random.seed(0)
+    all_indices = np.expand_dims(list(range(len(ds["train"]))), axis=1)
+    indices_pool = all_indices
+    labels = mlb.transform(ds["train"]["labels"])
+    train_samples = [8, 16, 32, 64, 128]
+    train_slices, last_k = [], 0
+
+    for i, k in enumerate(train_samples):
+        indices_pool, labels, new_slice, _ = iterative_train_test_split(indices_pool, labels, (k-last_k)/len(labels))
+        lask_k = k
+        if i==0: train_slices.append(new_slice)
+        else: train_slices.append(np.concatenate((train_slices[-1], new_slice)))
+    train_slices.append(all_indices)
+    train_samples.append(len(ds["train"]))
+    train_slices = [np.squeeze(train_slice) for train_slice in train_slices]
+    print(train_slices)
