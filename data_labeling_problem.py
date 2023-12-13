@@ -31,6 +31,9 @@ def prepare_labels(batch):
     batch["label_ids"] = mlb.transform(batch["labels"])
     return batch
 
+def zero_shot_pipeline(example):
+    output = pipe(example)
+
 
 if __name__ == '__main__':
     dataset_url = "https://git.io/nlp-with-transformers"
@@ -124,7 +127,8 @@ if __name__ == '__main__':
         classifier.fit(x_train_counts, y_train)
 
         y_pred_test = classifier.predict(x_test_counts)
-        clf_report = classification_report(y_test, y_pred_test, target_names=mlb.classes_, zero_division=0, output_dict=True)
+        clf_report = classification_report(y_test, y_pred_test, target_names=mlb.classes_, zero_division=0,
+                                           output_dict=True)
 
         macro_scores["Naive Bayes"].append(clf_report["macro avg"]["f1-score"])
         micro_scores["Naive Bayes"].append(clf_report["micro avg"]["f1-score"])
@@ -145,5 +149,8 @@ if __name__ == '__main__':
     pipe = pipeline("zero-shot-classification", device=0)
     sample = ds["train"][0]
     print(f"레이블 : {sample['labels']}")
-    output = pipe(sample["text"], all)
+    output = pipe(sample["text"], all_labels, multi_label=True)
+    print(output["sequence"][:400])
 
+    for label, score in zip(output["labels"], output["scores"]):
+        print(f"{label}, {score:.2f}")
