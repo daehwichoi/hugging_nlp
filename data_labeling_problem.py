@@ -31,8 +31,32 @@ def prepare_labels(batch):
     batch["label_ids"] = mlb.transform(batch["labels"])
     return batch
 
+
 def zero_shot_pipeline(example):
-    output = pipe(example)
+    output = pipe(example["text"], all_labels, multi_label=True)
+    example["predicted_labels"] = output["labels"]
+    example["scores"] = output["scores"]
+    return example
+
+
+def get_pred(example, threshold=None, topk=None):
+    pred = []
+    if threshold:
+        for label, score in zip(example["predicted_labels"], example["scores"]):
+            if score >= threshold:
+                pred.append(label)
+    elif topk:
+        for i in range(topk):
+            pred.append(example["predicted_labels"][i])
+    else:
+        raise ValueError("threshold 또는 topk로 지정해야합니다. ")
+    return {"pred_label_ids": list(np.squeeze(mlb.transform([pred])))}
+
+
+def get_clf_report(ds):
+    y_true = np.array(ds["label_ids"])
+    y_pred = np.array(ds["pred_label_ids"])
+    return classification_report(y_true, y_pred, target_names=mlb.classes_, zero_division=0, output_dict=True)
 
 
 if __name__ == '__main__':
@@ -154,3 +178,6 @@ if __name__ == '__main__':
 
     for label, score in zip(output["labels"], output["scores"]):
         print(f"{label}, {score:.2f}")
+
+    ds_zero_shot = ds["valid"].map(zero_shot_pipeline)
+    print(ds_zero_shot)
