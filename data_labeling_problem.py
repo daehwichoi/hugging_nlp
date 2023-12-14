@@ -3,17 +3,18 @@ import pandas as pd
 
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.metrics import classification_report
-from skmultilearn.problem_transform import BinaryRelevance
 from sklearn.feature_extraction.text import CountVectorizer
-
 from sklearn.preprocessing import MultiLabelBinarizer
+
+from skmultilearn.problem_transform import BinaryRelevance
 from skmultilearn.model_selection import iterative_train_test_split
 
 from datasets import Dataset, DatasetDict
 
 from collections import defaultdict
-from transformers import pipeline
+from transformers import pipeline, set_seed
 
+import nlpaug.augmenter.word as naw
 import matplotlib.pyplot as plt
 
 
@@ -69,8 +70,8 @@ def plot_metics(micro_scores, macro_scores, sample_sizes, current_model):
             ax0.plot(sample_sizes, micro_scores[run], label=run, linewidth=2)
             ax1.plot(sample_sizes, macro_scores[run], label=run, linewidth=2)
         else:
-            ax0.plot(sample_sizes, micro_scores[run], label =run, linestyle='dashed')
-            ax1.plot(sample_sizes, macro_scores[run], label =run, linestyle='dashed')
+            ax0.plot(sample_sizes, micro_scores[run], label=run, linestyle='dashed')
+            ax1.plot(sample_sizes, macro_scores[run], label=run, linestyle='dashed')
 
     ax0.set_title("Micro F1 scores")
     ax1.set_title("Macro F1 scores")
@@ -85,7 +86,24 @@ def plot_metics(micro_scores, macro_scores, sample_sizes, current_model):
     plt.tight_layout()
     plt.show()
 
+
+def augment_text(batch, transformations_per_example=1):
+    set_seed(3)
+    aug = naw.ContextualWordEmbsAug(model_path="distilbert-base-uncased", device='cuda', action='substitute')
+
+    text_aug, label_ids = [], []
+    for text, labels in zip(batch["text"], batch["label_ids"]):
+        text_aug += [text]
+        label_ids += [labels]
+
+        for _ in range(transformations_per_example):
+            text_aug += aug.augment(text)
+            label_ids += [labels]
+    return {"text": text_aug, "label_ids": label_ids}
+
+
 if __name__ == '__main__':
+    # if False:
     dataset_url = "https://git.io/nlp-with-transformers"
     df_issues = pd.read_json(dataset_url, lines=True)
     print(f"데이터프레임 크기 : {df_issues.shape}")
@@ -159,6 +177,8 @@ if __name__ == '__main__':
     train_samples.append(len(ds["train"]))
     train_slices = [np.squeeze(train_slice) for train_slice in train_slices]
 
+
+
     # Naive Bayes Model (Base model)
     ds = ds.map(prepare_labels, batched=True)
 
@@ -166,6 +186,8 @@ if __name__ == '__main__':
 
     for train_slice in train_slices:
         ds_train_sample = ds["train"].select(train_slice)  # 해당 개수만큼 select
+        ds_train_sample = ds_train_sample.map(augment_text, batched=True,
+                                              remove_columns=ds_train_sample.column_names).shuffle(seed=42)
         y_train = np.array(ds_train_sample["label_ids"])
         y_test = np.array(ds["test"]["label_ids"])
 
@@ -183,7 +205,6 @@ if __name__ == '__main__':
         macro_scores["Naive Bayes"].append(clf_report["macro avg"]["f1-score"])
         micro_scores["Naive Bayes"].append(clf_report["micro avg"]["f1-score"])
 
-
     pipe = pipeline("zero-shot-classification", device=0)
     sample = ds["train"][0]
     print(f"레이블 : {sample['labels']}")
@@ -193,8 +214,6 @@ if __name__ == '__main__':
     for label, score in zip(output["labels"], output["scores"]):
         print(f"{label}, {score:.2f}")
 
-
-
     ds_zero_shot = ds["test"].map(zero_shot_pipeline)
     ds_zero_shot = ds_zero_shot.map(get_pred, fn_kwargs={'topk': 1})
     clf_report = get_clf_report(ds_zero_shot)
@@ -202,6 +221,12 @@ if __name__ == '__main__':
         macro_scores["Zero Shot"].append(clf_report["macro avg"]["f1-score"])
         micro_scores["Zero Shot"].append(clf_report["micro avg"]["f1-score"])
 
-    print(micro_scores)
-    print(macro_scores)
+
+
     plot_metics(micro_scores, macro_scores, train_samples, 'Zero Shot')
+
+
+#
+# text = "Transformers are the most popular toys"
+# print(f"원본 텍스트 : {text}")
+# print(f"증식 텍스트 : {aug.augment(text)}")
