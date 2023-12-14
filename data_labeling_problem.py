@@ -14,6 +14,8 @@ from datasets import Dataset, DatasetDict
 from collections import defaultdict
 from transformers import pipeline
 
+import matplotlib.pyplot as plt
+
 
 def filter_labels(x):
     return [label_map[label] for label in x if label in label_map]
@@ -58,6 +60,30 @@ def get_clf_report(ds):
     y_pred = np.array(ds["pred_label_ids"])
     return classification_report(y_true, y_pred, target_names=mlb.classes_, zero_division=0, output_dict=True)
 
+
+def plot_metics(micro_scores, macro_scores, sample_sizes, current_model):
+    fig, (ax0, ax1) = plt.subplots(1, 2, figsize=(10, 4), sharey=True)
+
+    for run in micro_scores.keys():
+        if run == current_model:
+            ax0.plot(sample_sizes, micro_scores[run], label=run, linewidth=2)
+            ax1.plot(sample_sizes, macro_scores[run], label=run, linewidth=2)
+        else:
+            ax0.plot(sample_sizes, micro_scores[run], label =run, linestyle='dashed')
+            ax1.plot(sample_sizes, macro_scores[run], label =run, linestyle='dashed')
+
+    ax0.set_title("Micro F1 scores")
+    ax1.set_title("Macro F1 scores")
+    ax0.set_ylabel("Test set F1 score")
+    ax0.legend(loc="lower right")
+    for ax in [ax0, ax1]:
+        ax.set_xlabel("Number of training samples")
+        ax.set_xscale("log")
+        ax.set_xticks(sample_sizes)
+        ax.set_xticklabels(sample_sizes)
+        ax.minorticks_off()
+    plt.tight_layout()
+    plt.show()
 
 if __name__ == '__main__':
     dataset_url = "https://git.io/nlp-with-transformers"
@@ -157,8 +183,8 @@ if __name__ == '__main__':
         macro_scores["Naive Bayes"].append(clf_report["macro avg"]["f1-score"])
         micro_scores["Naive Bayes"].append(clf_report["micro avg"]["f1-score"])
 
-    print(macro_scores["Naive Bayes"])
-    print(micro_scores["Naive Bayes"])
+    # print(macro_scores["Naive Bayes"])
+    # print(micro_scores["Naive Bayes"])
 
     # Bert를 이용한 zero-shot
     # pipe = pipeline("fill-mask", model = "bert-base-uncased")
@@ -179,5 +205,16 @@ if __name__ == '__main__':
     for label, score in zip(output["labels"], output["scores"]):
         print(f"{label}, {score:.2f}")
 
-    ds_zero_shot = ds["valid"].map(zero_shot_pipeline)
-    print(ds_zero_shot)
+    # ds_zero_shot = ds["valid"].map(zero_shot_pipeline)
+    # print(ds_zero_shot)
+
+    ds_zero_shot = ds["test"].map(zero_shot_pipeline)
+    ds_zero_shot = ds_zero_shot.map(get_pred, fn_kwargs={'topk': 1})
+    clf_report = get_clf_report(ds_zero_shot)
+    for train_slice in train_slices:
+        macro_scores["Zero Shot"].append(clf_report["macro avg"]["f1-score"])
+        micro_scores["Zero Shot"].append(clf_report["micro avg"]["f1-score"])
+
+    print(micro_scores)
+    print(macro_scores)
+    plot_metics(micro_scores, macro_scores, train_samples, 'Zero Shot')
