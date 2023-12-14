@@ -183,18 +183,6 @@ if __name__ == '__main__':
         macro_scores["Naive Bayes"].append(clf_report["macro avg"]["f1-score"])
         micro_scores["Naive Bayes"].append(clf_report["micro avg"]["f1-score"])
 
-    # print(macro_scores["Naive Bayes"])
-    # print(micro_scores["Naive Bayes"])
-
-    # Bert를 이용한 zero-shot
-    # pipe = pipeline("fill-mask", model = "bert-base-uncased")
-    # movie_desc = "The main characters of the movie madacascar are a lion, a zebra, a giraffe, and a hippo."
-    # prompt = "The movie is about [MASK]."
-    #
-    # output = pipe(movie_desc+prompt)
-    #
-    # for ele in output:
-    #     print(f"토큰 {ele['token_str']}:\t {ele['score']:.3f}%")
 
     pipe = pipeline("zero-shot-classification", device=0)
     sample = ds["train"][0]
@@ -205,8 +193,7 @@ if __name__ == '__main__':
     for label, score in zip(output["labels"], output["scores"]):
         print(f"{label}, {score:.2f}")
 
-    # ds_zero_shot = ds["valid"].map(zero_shot_pipeline)
-    # print(ds_zero_shot)
+
 
     ds_zero_shot = ds["test"].map(zero_shot_pipeline)
     ds_zero_shot = ds_zero_shot.map(get_pred, fn_kwargs={'topk': 1})
